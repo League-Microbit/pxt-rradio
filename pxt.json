@@ -7,9 +7,19 @@
         "microphone": "*"
     },
     "files": [
-        "main.blocks",
         "main.ts",
         "README.md"
+    ],
+    "files": [
+        "src/radiop.ts",
+        "src/joystick.ts",
+        "src/botstate.ts",
+        "src/negotiate.ts",
+        "src/lib.ts",
+        "README.md",
+        "shims.d.ts",
+        "enums.d.ts",
+        "src/main.ts"
     ],
     "testFiles": [
         "test.ts"
