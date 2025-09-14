@@ -219,7 +219,6 @@ namespace radiop {
 
 
         while (true) {
-            radioIcon.showImage(0); // Show radio icon to indicate negotiation started
 
             if (testChannel(i, channel, group)) {
                 // Return both channel and group as an array

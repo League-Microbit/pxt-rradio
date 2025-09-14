@@ -24,9 +24,11 @@ namespace radiop {
 
 
     export enum PayloadType {
-        JOY = 10,
-        HERE_I_AM = 11,
-        BOT_STATUS = 12
+        HERE_I_AM = 10,
+        DISPLAY = 11,
+        BOT_COMMAND = 20,
+        BOT_STATUS = 21
+
     }
 
     export function setGroup(group: number) {
@@ -56,8 +58,6 @@ namespace radiop {
     }
 
 
-
-
     /**
      * Base class for all radio payloads
      */
@@ -79,7 +79,6 @@ namespace radiop {
             this.buffer.setNumber(NumberFormat.UInt8LE,
                                   this.BYTE_POS_PACKET_TYPE, packetType);
         }
-
 
         get time(): number {
             if (this.packet) {
@@ -170,7 +169,10 @@ namespace radiop {
         su8(off: number, v: number) { this.buffer.setNumber(NumberFormat.UInt8LE, off, v & 0xff); }
 
 
+    }
 
+    export function clip(x: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, x));
     }
 
     /* Construct a payload from a buffer. This is the central
@@ -180,12 +182,12 @@ namespace radiop {
         let packetType = buffer.getNumber(NumberFormat.UInt8LE, 0);
 
         switch (packetType) {
-            case PayloadType.JOY:
-                return radiop.JoyPayload.fromBuffer(buffer);
+            case PayloadType.DISPLAY:
+                return radiop.DisplayPayload.fromBuffer(buffer);
             case PayloadType.HERE_I_AM:
                 return radiop.HereIAm.fromBuffer(buffer);
             case PayloadType.BOT_STATUS:
-                return radiop.BotStatePayload.fromBuffer(buffer);
+                return radiop.BotStatusPayload.fromBuffer(buffer);
         }
 
         return undefined;

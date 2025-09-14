@@ -1,10 +1,10 @@
 # Bot Commands and Responses
 
-# Motion commands
+# BotCommandPayload: Motion commands
 
-* Metric (Time, Velocity, Position, Power)
-* Left wheel power
-* Right Wheel power
-* Run time 
-
-
+* byte commandType  ( Enum: Time, Velocity, Position, Power)
+* int16 motor_1
+* int16 motor_2
+* int16 motor_3
+* int16 motor_4 
+* int16 time
