@@ -13,26 +13,34 @@ namespace radiop {
     export class DisplayPayload extends radiop.RadioPayload {
 
     /**
-     * Buffer layout (size: 31 bytes):
-     * Byte 0   : Packet type (1 byte)
-     * Byte 1   : tone (UInt8LE, 1 byte)
-     * Byte 2   : duration (UInt8LE, 1 byte)
-     * Byte 3-6 : image (UInt32LE, 4 bytes, lower 25 bits used)
-     * Byte 7-18: Reserved/other payload (12 bytes)
-     * Byte 19-21: headLampLeft (24-bit color, 3 bytes)
-     * Byte 22-24: headLampRight (24-bit color, 3 bytes)
-     * Byte 25-27: neoLeft (24-bit color, 3 bytes)
-     * Byte 28-30: neoRight (24-bit color, 3 bytes)
-     *
-     * Color values are packed at the end of the buffer after image.
+     * Buffer layout (total size: 27 bytes):
+     * Byte 0            : Packet type (1 byte)
+     * Byte 1-8          : Standard header (time, serial) when enabled
+     * Payload offsets (relative to payload start at byte 9):
+     *   +0  tone (UInt8LE, 1 byte)
+     *   +1  duration (UInt8LE, 1 byte)
+     *   +2  image (UInt32LE, 4 bytes, lower 25 bits used)
+     *   +6  headLampLeft (24-bit color, 3 bytes)
+     *   +9  headLampRight (24-bit color, 3 bytes)
+     *   +12 neoLeft (24-bit color, 3 bytes)
+     *   +15 neoRight (24-bit color, 3 bytes)
      */
-    static readonly PACKET_SIZE: number = 31;
+    static readonly PACKET_SIZE: number = RadioPacket.HEADER_SIZE + 18;
+
+        private static readonly OFFSET_TONE = 0;
+        private static readonly OFFSET_DURATION = 1;
+        private static readonly OFFSET_IMAGE = 2;
+        private static readonly OFFSET_HEAD_LAMP_LEFT = 6;
+        private static readonly OFFSET_HEAD_LAMP_RIGHT = 9;
+        private static readonly OFFSET_NEO_LEFT = 12;
+        private static readonly OFFSET_NEO_RIGHT = 15;
 
 
         constructor(buf?: Buffer) {
             super(radiop.PayloadType.DISPLAY, DisplayPayload.PACKET_SIZE);
-            if (buf) this.buffer = buf;
-            else this.buffer.setNumber(NumberFormat.UInt8LE, 0, radiop.PayloadType.DISPLAY);
+            if (buf) {
+                this.adoptBuffer(buf);
+            }
         }
         static fromBuffer(b: Buffer): DisplayPayload {
             if (!b || b.length != DisplayPayload.PACKET_SIZE) return null;
@@ -40,9 +48,9 @@ namespace radiop {
         }
 
         // --- Packed values at the bottom of the buffer ---
-        // Byte 1: tone (UInt8LE)
-        get tone(): number { return this.buffer.getNumber(NumberFormat.UInt8LE, 1); }
-        set tone(v: number) { this.buffer.setNumber(NumberFormat.UInt8LE, 1, v & 0xff); }
+        // Byte +0: tone (UInt8LE)
+        get tone(): number { return this.data.getNumber(NumberFormat.UInt8LE, this.payloadOffset(DisplayPayload.OFFSET_TONE)); }
+        set tone(v: number) { this.data.setNumber(NumberFormat.UInt8LE, this.payloadOffset(DisplayPayload.OFFSET_TONE), v & 0xff); }
 
         /** Set octave and note 
          *  Middle C is Octave 4, Note 1
@@ -53,13 +61,13 @@ namespace radiop {
             this.tone = (octave << 4) | (note & 0x0f);
         }
 
-        // Byte 2: duration (UInt8LE)
-        get duration(): number { return this.buffer.getNumber(NumberFormat.UInt8LE, 2); }
-        set duration(v: number) { this.buffer.setNumber(NumberFormat.UInt8LE, 2, v & 0xff); }
+    // Byte +1: duration (UInt8LE)
+    get duration(): number { return this.data.getNumber(NumberFormat.UInt8LE, this.payloadOffset(DisplayPayload.OFFSET_DURATION)); }
+    set duration(v: number) { this.data.setNumber(NumberFormat.UInt8LE, this.payloadOffset(DisplayPayload.OFFSET_DURATION), v & 0xff); }
 
-        // Byte 3-6: image (UInt32LE, lower 25 bits used)
-        get image(): number { return this.buffer.getNumber(NumberFormat.UInt32LE, 3); }
-        set image(v: number) { this.buffer.setNumber(NumberFormat.UInt32LE, 3, (v | 0) >>> 0); }
+    // Byte +2-5: image (UInt32LE, lower 25 bits used)
+    get image(): number { return this.data.getNumber(NumberFormat.UInt32LE, this.payloadOffset(DisplayPayload.OFFSET_IMAGE)); }
+    set image(v: number) { this.data.setNumber(NumberFormat.UInt32LE, this.payloadOffset(DisplayPayload.OFFSET_IMAGE), (v | 0) >>> 0); }
 
         /** Set image from an IconNames enum value */
         setIcon(icon: IconNames) {
@@ -79,9 +87,10 @@ namespace radiop {
          * @param value 32-bit int, only lower 24 bits used
          */
         setColor(position: number, value: number) {
-            this.buffer.setNumber(NumberFormat.UInt8LE, position, (value >> 16) & 0xFF);
-            this.buffer.setNumber(NumberFormat.UInt8LE, position + 1, (value >> 8) & 0xFF);
-            this.buffer.setNumber(NumberFormat.UInt8LE, position + 2, value & 0xFF);
+            const offset = this.payloadOffset(position);
+            this.data.setNumber(NumberFormat.UInt8LE, offset, (value >> 16) & 0xFF);
+            this.data.setNumber(NumberFormat.UInt8LE, offset + 1, (value >> 8) & 0xFF);
+            this.data.setNumber(NumberFormat.UInt8LE, offset + 2, value & 0xFF);
         }
 
         /**
@@ -90,23 +99,24 @@ namespace radiop {
          * @returns 32-bit int, only lower 24 bits used
          */
         getColor(position: number): number {
-            return ((this.buffer.getNumber(NumberFormat.UInt8LE, position) << 16) |
-                    (this.buffer.getNumber(NumberFormat.UInt8LE, position + 1) << 8) |
-                    (this.buffer.getNumber(NumberFormat.UInt8LE, position + 2)) ) >>> 0;
+            const offset = this.payloadOffset(position);
+            return ((this.data.getNumber(NumberFormat.UInt8LE, offset) << 16) |
+                    (this.data.getNumber(NumberFormat.UInt8LE, offset + 1) << 8) |
+                    (this.data.getNumber(NumberFormat.UInt8LE, offset + 2)) ) >>> 0;
         }
 
     // Headlamp and NeoPixel color accessors (packed after image)
-    get headLampLeft(): number { return this.getColor(7); }
-    set headLampLeft(v: number) { this.setColor(7, v); }
+    get headLampLeft(): number { return this.getColor(DisplayPayload.OFFSET_HEAD_LAMP_LEFT); }
+    set headLampLeft(v: number) { this.setColor(DisplayPayload.OFFSET_HEAD_LAMP_LEFT, v); }
 
-    get headLampRight(): number { return this.getColor(10); }
-    set headLampRight(v: number) { this.setColor(10, v); }
+    get headLampRight(): number { return this.getColor(DisplayPayload.OFFSET_HEAD_LAMP_RIGHT); }
+    set headLampRight(v: number) { this.setColor(DisplayPayload.OFFSET_HEAD_LAMP_RIGHT, v); }
 
-    get neoLeft(): number { return this.getColor(13); }
-    set neoLeft(v: number) { this.setColor(13, v); }
+    get neoLeft(): number { return this.getColor(DisplayPayload.OFFSET_NEO_LEFT); }
+    set neoLeft(v: number) { this.setColor(DisplayPayload.OFFSET_NEO_LEFT, v); }
 
-    get neoRight(): number { return this.getColor(16); }
-    set neoRight(v: number) { this.setColor(16, v); }
+    get neoRight(): number { return this.getColor(DisplayPayload.OFFSET_NEO_RIGHT); }
+    set neoRight(v: number) { this.setColor(DisplayPayload.OFFSET_NEO_RIGHT, v); }
 
         private colorToHex(value: number): string {
             value = value & 0xFFFFFF;
@@ -129,7 +139,7 @@ namespace radiop {
                 ")";
         }
 
-        get payloadLength() { return DisplayPayload.PACKET_SIZE; }
+    get payloadLength() { return DisplayPayload.PACKET_SIZE - this.BYTE_POS_PAYLOAD_START; }
 
         get handler(): (payload: radiop.RadioPayload) => void {
             return _onReceiveDisplayHandler as any;

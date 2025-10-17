@@ -37,7 +37,13 @@ namespace radiop {
         return _useStdHeader;
     }
 
+    // NOTE! The docs say that we can send 32 bytes, bbut there is a bug which will 
+    // clobber the last three bytes: https://github.com/lancaster-university/codal-microbit-v2/issues/383
+    // So you will generallt only be able to send 29. 
+
     export class RadioPacket {
+        static readonly HEADER_SIZE = 9; // type + time (4 bytes) + serial (4 bytes)
+
         data: Buffer;
 
         constructor(size: number) {
@@ -113,55 +119,61 @@ namespace radiop {
         return _channel;
     }
 
+    export class RadioPayload extends RadioPacket {
 
-    /**
-     * Base class for all radio payloads
-     */
-    export class RadioPayload {
-
-        readonly BYTE_POS_PACKET_TYPE = 0; // Position of packet type in the buffer
-        readonly BYTE_POS_PAYLOAD_START = 1; // Position of payload start in the buffer
-        static readonly MAX_PACKET_SIZE = 19; // Max size of a radio buffer ( not the whole packet, which is 32 bytes )
+    readonly BYTE_POS_PACKET_TYPE = 0; // Position of packet type in the buffer
+    readonly BYTE_POS_PAYLOAD_START = RadioPacket.HEADER_SIZE; // Position of payload start in the buffer
+    static readonly MAX_PACKET_SIZE = 32; // Maximum raw packet length supported by the radio
 
 
-        public packet: RadioPacket = undefined; 
-        protected buffer: Buffer;
-        protected packetType: number;
+        public packet: RadioPacket = undefined;
 
         constructor(packetType: number, size: number) {
+            super(size);
             this.packetType = packetType;
-            this.buffer = control.createBuffer(size);
-            this.buffer.fill(0)
-            this.buffer.setNumber(NumberFormat.UInt8LE,
-                                  this.BYTE_POS_PACKET_TYPE, packetType);
+        }
+
+        protected adoptBuffer(buf: Buffer) {
+            if (buf) {
+                this.data = buf;
+                this.packetType = this.data.getNumber(NumberFormat.UInt8LE, this.BYTE_POS_PACKET_TYPE);
+            }
         }
 
         get time(): number {
             if (this.packet) {
                 return this.packet.time;
             }
-            return 0;
+            return this.data.getNumber(NumberFormat.Int32LE, 1);
+        }
+
+        set time(val: number) {
+            this.data.setNumber(NumberFormat.Int32LE, 1, val);
         }
 
         get serial(): number {
             if (this.packet) {
                 return this.packet.serial;
             }
-            return 0;
+            return this.data.getNumber(NumberFormat.Int32LE, 5);
+        }
+
+        set serial(val: number) {
+            this.data.setNumber(NumberFormat.Int32LE, 5, val);
         }
 
         get signal(): number {
             if (this.packet) {
                 return this.packet.signal;
             }
-            return 0;
+            return this.data.getNumber(NumberFormat.Int32LE, this.data.length - 4);
         }
         static fromBuffer(buffer: Buffer): RadioPayload {
             return undefined;
         }
 
         getBuffer(): Buffer {
-            return this.buffer;
+            return this.data;
         }
 
         getPacketType(): number {
@@ -169,11 +181,11 @@ namespace radiop {
         }
 
         get payloadLength() {
-            return 0;
+            return Math.max(0, this.data.length - this.BYTE_POS_PAYLOAD_START);
         }
 
         get hash(): number {
-            return this.buffer.hash(32);
+            return this.data.hash(32);
         }
 
         get handler(): (payload: RadioPayload) => void {
@@ -185,15 +197,15 @@ namespace radiop {
         }
 
         send(): void {
-            let buf = this.getBuffer();
-            let out = new RadioPacket(buf.length);
-            copyBuffer(buf, out.data);
-            out.packetType = this.packetType;
             if (_useStdHeader) {
-                out.time = control.millis();
-                out.serial = control.deviceSerialNumber();
+                this.time = control.millis();
+                this.serial = control.deviceSerialNumber();
             }
-            out.sendPacket();
+            this.sendPacket();
+        }
+
+        protected payloadOffset(offset: number): number {
+            return this.BYTE_POS_PAYLOAD_START + offset;
         }
 
         /** Get the value (0/1) of a bit within a number stored at a byte offset in the payload buffer.
@@ -203,7 +215,7 @@ namespace radiop {
          */
         getBit(byteOffset: number, bit: number, format: NumberFormat = NumberFormat.UInt8LE): number {
             if (bit < 0 || bit > 31) return 0;
-            let v = this.buffer.getNumber(format, byteOffset);
+            let v = this.data.getNumber(format, this.payloadOffset(byteOffset));
             return (v & (1 << bit)) ? 1 : 0;
         }
 
@@ -215,26 +227,26 @@ namespace radiop {
          */
         setBit(byteOffset: number, bit: number, value: number | boolean, format: NumberFormat = NumberFormat.UInt8LE): void {
             if (bit < 0 || bit > 31) return;
-            let v = this.buffer.getNumber(format, byteOffset);
+            let v = this.data.getNumber(format, this.payloadOffset(byteOffset));
             if (value ? true : false) v |= (1 << bit); else v &= ~(1 << bit);
-            this.buffer.setNumber(format, byteOffset, v);
+            this.data.setNumber(format, this.payloadOffset(byteOffset), v);
         }
 
         /** Toggle (invert) a bit at the given position */
         toggleBit(byteOffset: number, bit: number, format: NumberFormat = NumberFormat.UInt8LE): void {
             if (bit < 0 || bit > 31) return;
-            let v = this.buffer.getNumber(format, byteOffset) ^ (1 << bit);
-            this.buffer.setNumber(format, byteOffset, v);
+            let v = this.data.getNumber(format, this.payloadOffset(byteOffset)) ^ (1 << bit);
+            this.data.setNumber(format, this.payloadOffset(byteOffset), v);
         }
 
         // Short numeric accessors to reduce repetition and possibly flash size
-        u16(off: number): number { return this.buffer.getNumber(NumberFormat.UInt16LE, off); }
-        su16(off: number, v: number) { this.buffer.setNumber(NumberFormat.UInt16LE, off, v & 0xffff); }
-        i16(off: number): number { return this.buffer.getNumber(NumberFormat.Int16LE, off); }
-        si16(off: number, v: number) { this.buffer.setNumber(NumberFormat.Int16LE, off, v); }
+        u16(off: number): number { return this.data.getNumber(NumberFormat.UInt16LE, this.payloadOffset(off)); }
+        su16(off: number, v: number) { this.data.setNumber(NumberFormat.UInt16LE, this.payloadOffset(off), v & 0xffff); }
+        i16(off: number): number { return this.data.getNumber(NumberFormat.Int16LE, this.payloadOffset(off)); }
+        si16(off: number, v: number) { this.data.setNumber(NumberFormat.Int16LE, this.payloadOffset(off), v); }
 
-        u8(off: number): number { return this.buffer.getNumber(NumberFormat.UInt8LE, off); }
-        su8(off: number, v: number) { this.buffer.setNumber(NumberFormat.UInt8LE, off, v & 0xff); }
+        u8(off: number): number { return this.data.getNumber(NumberFormat.UInt8LE, this.payloadOffset(off)); }
+        su8(off: number, v: number) { this.data.setNumber(NumberFormat.UInt8LE, this.payloadOffset(off), v & 0xff); }
 
 
     }
@@ -250,13 +262,13 @@ namespace radiop {
         let packetType = buffer.getNumber(NumberFormat.UInt8LE, 0);
 
         switch (packetType) {
-            case PayloadType.HERE_I_AM:
+            case radiop.PayloadType.HERE_I_AM:
                 return radiop.HereIAm.fromBuffer(buffer);
-            case PayloadType.DISPLAY:
+            case radiop.PayloadType.DISPLAY:
                 return radiop.DisplayPayload.fromBuffer(buffer);
-            case PayloadType.BOT_COMMAND:
+            case radiop.PayloadType.BOT_COMMAND:
                 return radiop.BotCommandPayload.fromBuffer(buffer);
-            case PayloadType.BOT_STATUS:
+            case radiop.PayloadType.BOT_STATUS:
                 return radiop.BotStatusPayload.fromBuffer(buffer);
         }
 
@@ -290,8 +302,8 @@ namespace radiop {
             if (channel !== _channel || group !== _group) {
                 // If channel or group changed, reinitialize
           
-                setGroup(group);
-                setChannel(channel);
+                radiop.setGroup(group);
+                radiop.setChannel(channel);
                 radio.setTransmitPower(power);
                 broadcastHereIAm(); // Resend HereIAm message
             }
@@ -302,8 +314,8 @@ namespace radiop {
 
         // Initialize radio
         // removed serial logging (initialized)
-        setGroup(group);
-        setChannel(channel);
+    radiop.setGroup(group);
+    radiop.setChannel(channel);
         useStdHeader(true);
             
         if (power !== undefined) {

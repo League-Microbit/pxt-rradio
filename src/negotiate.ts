@@ -50,12 +50,17 @@ namespace radiop {
     //  Bytes8-11: image (u32)
     export class HereIAm extends radiop.RadioPayload {
 
-        static readonly PACKET_SIZE = 12;
+    static readonly PACKET_SIZE = RadioPacket.HEADER_SIZE + 11;
+        private static readonly OFFSET_CLASS_ID = 0;
+        private static readonly OFFSET_GROUP = 1;
+        private static readonly OFFSET_CHANNEL = 3;
+        private static readonly OFFSET_FLAGS = 5;
 
         constructor(buf?: Buffer) {
             super(radiop.PayloadType.HERE_I_AM, HereIAm.PACKET_SIZE);
-            if (buf) this.buffer = buf; else {
-                this.buffer.setNumber(NumberFormat.UInt8LE, 0, radiop.PayloadType.HERE_I_AM);
+            if (buf) {
+                this.adoptBuffer(buf);
+            } else {
                 this.classId = myClassId;
                 this.group = radiop.getGroup();
                 this.channel = radiop.getChannel();
@@ -63,14 +68,14 @@ namespace radiop {
             }
         }
         static fromBuffer(b: Buffer): HereIAm { if (!b || b.length < HereIAm.PACKET_SIZE) return null; return new HereIAm(b); }
-        get classId(): DeviceClass { return this.buffer.getNumber(NumberFormat.UInt8LE, 1); }
-        set classId(v: DeviceClass) { this.buffer.setNumber(NumberFormat.UInt8LE, 1, v & 0xff); }
-        get group(): number { return this.u16(2); }
-        set group(v: number) { this.su16(2, v); }
-        get channel(): number { return this.u16(4); }
-        set channel(v: number) { this.su16(4, v); }
-        get flags(): number { return this.u16(6); }
-        set flags(v: number) { this.su16(6, v); }
+        get classId(): DeviceClass { return this.u8(HereIAm.OFFSET_CLASS_ID); }
+        set classId(v: DeviceClass) { this.su8(HereIAm.OFFSET_CLASS_ID, v & 0xff); }
+        get group(): number { return this.u16(HereIAm.OFFSET_GROUP); }
+        set group(v: number) { this.su16(HereIAm.OFFSET_GROUP, v); }
+        get channel(): number { return this.u16(HereIAm.OFFSET_CHANNEL); }
+        set channel(v: number) { this.su16(HereIAm.OFFSET_CHANNEL, v); }
+        get flags(): number { return this.u16(HereIAm.OFFSET_FLAGS); }
+        set flags(v: number) { this.su16(HereIAm.OFFSET_FLAGS, v); }
 
 
         dump(): string {
@@ -78,7 +83,7 @@ namespace radiop {
                 ", classId=" + this.classId +
                 ", group=" + this.group +
                 ", channel=" + this.channel +
-                ", flags=" + this.flags +
+                ", flags=" + this.flags
                 ")";
         }
 

@@ -10,7 +10,7 @@ namespace radiop {
 
         constructor() {
             radiop.initDefaults();
-            radiop.useStdHeader(true);
+            radiop.useStdHeader(false);
             basic.showIcon(IconNames.Target);
             serial.setRxBufferSize(128);
             serial.setTxBufferSize(128);

@@ -10,12 +10,17 @@ namespace radiop {
     /** BotStatus payload mirrors JoyPayload layout but uses BOT_STATUS packet type and provides alias accessors. */
     export class BotStatusPayload extends radiop.RadioPayload {
 
-        static PACKET_SIZE = 8;
+    static PACKET_SIZE = RadioPacket.HEADER_SIZE + 7;
+        private static readonly OFFSET_BUTTONS = 0;
+        private static readonly OFFSET_ACCEL_X = 1;
+        private static readonly OFFSET_ACCEL_Y = 3;
+        private static readonly OFFSET_ACCEL_Z = 5;
 
         constructor(buf?: Buffer) {
             super(radiop.PayloadType.BOT_STATUS, BotStatusPayload.PACKET_SIZE);
-            if (buf) this.buffer = buf;
-            else this.buffer.setNumber(NumberFormat.UInt8LE, 0, radiop.PayloadType.BOT_STATUS);
+            if (buf) {
+                this.adoptBuffer(buf);
+            }
         }
 
         static fromBuffer(b: Buffer): BotStatusPayload {
@@ -23,17 +28,17 @@ namespace radiop {
             return new BotStatusPayload(b);
         }
 
-        get buttons(): number { return this.u8(1); }
-        set buttons(v: number) { this.su8(1, v); }
+    get buttons(): number { return this.u8(BotStatusPayload.OFFSET_BUTTONS); }
+    set buttons(v: number) { this.su8(BotStatusPayload.OFFSET_BUTTONS, v); }
 
-        get accelX(): number { return this.i16(2); }
-        set accelX(v: number) { this.si16(2, v); }
+    get accelX(): number { return this.i16(BotStatusPayload.OFFSET_ACCEL_X); }
+    set accelX(v: number) { this.si16(BotStatusPayload.OFFSET_ACCEL_X, v); }
 
-        get accelY(): number { return this.i16(4); }
-        set accelY(v: number) { this.si16(4, v); }
+    get accelY(): number { return this.i16(BotStatusPayload.OFFSET_ACCEL_Y); }
+    set accelY(v: number) { this.si16(BotStatusPayload.OFFSET_ACCEL_Y, v); }
 
-        get accelZ(): number { return this.i16(6); }
-        set accelZ(v: number) { this.si16(6, v); }
+    get accelZ(): number { return this.i16(BotStatusPayload.OFFSET_ACCEL_Z); }
+    set accelZ(v: number) { this.si16(BotStatusPayload.OFFSET_ACCEL_Z, v); }
 
         dump(): string {
             return "BotStatusPayload(serial=" + radiop.toHex(this.serial) +

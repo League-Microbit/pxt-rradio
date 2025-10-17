@@ -86,16 +86,21 @@ def pump_serial(port: serial.Serial, duration: float) -> None:
         time.sleep(0.05)
 
 
-def send_packets(port: serial.Serial, count: int, interval: float, randomize: bool) -> None:
+def send_packets(port: serial.Serial, count: int, interval: float, randomize: bool, words: bool | str) -> None:
     click.echo(
         f"Sending {count} packet(s) every {interval:.3f}s with "
         f"{'random' if randomize else 'pattern'} payloads."
     )
     pump_serial(port, 0.2)
 
+
     for index in range(count):
-        payload = generate_payload(index, randomize)
-        payload_hex = payload.hex()
+        if words:
+            payload_hex = words+words
+        else:
+            payload = generate_payload(index, randomize)
+            payload_hex = payload.hex()
+
         command = f"{CMD_SEND} {payload_hex}"
         port.write(command.encode("ascii") + b"\n")
         port.flush()
@@ -155,13 +160,23 @@ def render_port_table(ports: Iterable[ListPortInfo]) -> None:
     is_flag=True,
     help="Send random 32-byte payloads.",
 )
+@click.option(
+    "--words",
+    "-w",
+    is_flag=True,
+    help="Send words in hex",
+)
 def main(
     list_only: bool,
     device: Optional[str],
     count: int,
     interval: float,
     rand: bool,
+    words: bool,
 ) -> None:
+
+    hex_words= 'deadbeefcafefoodbabe8badf00dd00dface'
+
     if list_only:
         render_port_table(usb_serial_ports())
         return
@@ -182,7 +197,7 @@ def main(
         with serial.Serial(resolved, baudrate=115200, timeout=0.1) as port:
             click.echo(f"Opened {resolved} @ {port.baudrate} baud")
             port.reset_input_buffer()
-            send_packets(port, count, interval, rand)
+            send_packets(port, count, interval, rand, hex_words if words else None)
     except serial.SerialException as exc:  # pragma: no cover - hardware dependent
         click.echo(f"Failed to open serial port: {exc}", err=True)
         sys.exit(1)
