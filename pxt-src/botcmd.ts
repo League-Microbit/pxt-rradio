@@ -46,8 +46,8 @@ namespace radiop {
         get motor4(): number { return this.i16(BotCommandPayload.OFFSET_MOTOR4); }
         set motor4(v: number) { this.si16(BotCommandPayload.OFFSET_MOTOR4, v); }
 
-    get duration(): number { return this.i16(BotCommandPayload.OFFSET_DURATION); }
-    set duration(v: number) { this.si16(BotCommandPayload.OFFSET_DURATION, v); }
+        get duration(): number { return this.i16(BotCommandPayload.OFFSET_DURATION); }
+        set duration(v: number) { this.si16(BotCommandPayload.OFFSET_DURATION, v); }
 
         dump(): string {
             return "BotCommandPayload(serial=" + radiop.toHex(this.serial) +
