@@ -257,7 +257,7 @@ namespace radiop {
 
     /* Construct a payload from a buffer. This is the central
     * place to add definitions for new payloads */
-    function extractPayload(buffer: Buffer): RadioPayload {
+    export function extractPayload(buffer: Buffer): RadioPayload {
 
         let packetType = buffer.getNumber(NumberFormat.UInt8LE, 0);
 

@@ -12,7 +12,7 @@ namespace radiop {
 
     export class BotCommandPayload extends radiop.RadioPayload {
 
-    static readonly PACKET_SIZE: number = RadioPacket.HEADER_SIZE + 11;
+        static readonly PACKET_SIZE: number = RadioPacket.HEADER_SIZE + 11;
         private static readonly OFFSET_COMMAND = 0;
         private static readonly OFFSET_MOTOR1 = 1;
         private static readonly OFFSET_MOTOR2 = 3;
@@ -24,10 +24,12 @@ namespace radiop {
             super(radiop.PayloadType.BOT_COMMAND, BotCommandPayload.PACKET_SIZE);
             if (buf) {
                 this.adoptBuffer(buf);
+            } else {
+                this.packetType = radiop.PayloadType.BOT_COMMAND;
             }
         }
         static fromBuffer(b: Buffer): BotCommandPayload {
-            if (!b || b.length != BotCommandPayload.PACKET_SIZE) return null;
+            if (!b || b.length < BotCommandPayload.PACKET_SIZE) return null;
             return new BotCommandPayload(b);
         }
 

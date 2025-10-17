@@ -40,10 +40,12 @@ namespace radiop {
             super(radiop.PayloadType.DISPLAY, DisplayPayload.PACKET_SIZE);
             if (buf) {
                 this.adoptBuffer(buf);
+            } else {
+                this.packetType = radiop.PayloadType.DISPLAY;
             }
         }
         static fromBuffer(b: Buffer): DisplayPayload {
-            if (!b || b.length != DisplayPayload.PACKET_SIZE) return null;
+            if (!b || b.length < DisplayPayload.PACKET_SIZE) return null;
             return new DisplayPayload(b);
         }
 

@@ -61,6 +61,7 @@ namespace radiop {
             if (buf) {
                 this.adoptBuffer(buf);
             } else {
+                this.packetType = radiop.PayloadType.HERE_I_AM;
                 this.classId = myClassId;
                 this.group = radiop.getGroup();
                 this.channel = radiop.getChannel();

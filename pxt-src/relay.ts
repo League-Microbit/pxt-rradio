@@ -25,15 +25,22 @@ namespace radiop {
         }
 
         private registerRadioHook() {
+            const self = this;
             radio.onDataReceived(function () {
-                let buffer: Buffer = radio.readRawPacket();
-                
+                const buffer = radio.readRawPacket();
                 const hex = buffer.toHex();
-      
-                serial.writeLine(CMD_RECEIVE+" " + hex);
-                if (this.echoMode) {
+
+                serial.writeLine(CMD_RECEIVE + " " + hex);
+
+               
+
+                if (self.echoMode) {
                     radio.sendRawPacket(buffer);
                     serial.writeLine("e: " + hex);
+                    const payload = radiop.extractPayload(buffer);
+                    if (payload) {
+                        serial.writeLine("p: " + payload.dump());
+                    }
                 }
             });
         }

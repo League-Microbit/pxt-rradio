@@ -20,6 +20,8 @@ namespace radiop {
             super(radiop.PayloadType.BOT_STATUS, BotStatusPayload.PACKET_SIZE);
             if (buf) {
                 this.adoptBuffer(buf);
+            } else {
+                this.packetType = radiop.PayloadType.BOT_STATUS;
             }
         }
 
