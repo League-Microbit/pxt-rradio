@@ -4,6 +4,12 @@
 
 namespace radiop {
 
+    let _onReceiveDisplayHandler: (payload: DisplayPayload) => void = null;
+
+    export function onReceiveDisplay(handler: (payload: DisplayPayload) => void) {
+        _onReceiveDisplayHandler = handler;
+    }
+
     export class DisplayPayload extends radiop.RadioPayload {
 
     /**
@@ -102,7 +108,32 @@ namespace radiop {
     get neoRight(): number { return this.getColor(16); }
     set neoRight(v: number) { this.setColor(16, v); }
 
+        private colorToHex(value: number): string {
+            value = value & 0xFFFFFF;
+            const hexChars = "0123456789ABCDEF";
+            let hex = "";
+            for (let i = 0; i < 6; i++) {
+                hex = hexChars.charAt(value & 0x0F) + hex;
+                value = value >> 4;
+            }
+            return "#" + hex;
+        }
+
+        dump(): string {
+            return "DisplayPayload(serial=" + radiop.toHex(this.serial) +
+                ", tone=" + this.tone +
+                ", duration=" + this.duration +
+                ", image=" + radiop.toHex(this.image) +
+                ", lamps=[" + this.colorToHex(this.headLampLeft) + "," + this.colorToHex(this.headLampRight) +
+                "," + this.colorToHex(this.neoLeft) + "," + this.colorToHex(this.neoRight) + "]" +
+                ")";
+        }
+
         get payloadLength() { return DisplayPayload.PACKET_SIZE; }
+
+        get handler(): (payload: radiop.RadioPayload) => void {
+            return _onReceiveDisplayHandler as any;
+        }
 
     }
     

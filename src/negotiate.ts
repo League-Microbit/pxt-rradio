@@ -8,6 +8,7 @@ namespace radiop {
     // Device class enum stored as single byte in HereIAm packet
     export enum DeviceClass {
         UNKNOWN = 0,
+        BEACON = 1,
         CUTEBOT = 10,
         CUTEBOTPRO = 11,
         JOYSTICK = 20,
@@ -59,7 +60,6 @@ namespace radiop {
                 this.group = radiop.getGroup();
                 this.channel = radiop.getChannel();
                 this.flags = 0;
-                this.image = 0;
             }
         }
         static fromBuffer(b: Buffer): HereIAm { if (!b || b.length < HereIAm.PACKET_SIZE) return null; return new HereIAm(b); }
@@ -71,8 +71,16 @@ namespace radiop {
         set channel(v: number) { this.su16(4, v); }
         get flags(): number { return this.u16(6); }
         set flags(v: number) { this.su16(6, v); }
-        get image(): number { return this.buffer.getNumber(NumberFormat.UInt32LE, 8); }
-        set image(v: number) { this.buffer.setNumber(NumberFormat.UInt32LE, 8, (v | 0) >>> 0); }
+
+
+        dump(): string {
+            return "HereIAm(serial=" + radiop.toHex(this.serial) +
+                ", classId=" + this.classId +
+                ", group=" + this.group +
+                ", channel=" + this.channel +
+                ", flags=" + this.flags +
+                ")";
+        }
 
         get handler(): (payload: HereIAm) => void { return _onReceiveHandler; }
     }
@@ -142,7 +150,8 @@ namespace radiop {
         control.inBackground(function () {
             while (true) {
                 if (_runBeacon) {
-                    let hereIAm = newHereIAm();
+                    let hereIAm = newHereIAm(); 
+                    serial.writeLine("Beacon: ch=" + hereIAm.channel + " grp=" + hereIAm.group);
                     hereIAm.send(); // Send to my private radio
                     if (lastChannel !== radiop.getChannel() || lastGroup !== radiop.getGroup() || bCountDown <= 0) {
                         lastChannel = radiop.getChannel();

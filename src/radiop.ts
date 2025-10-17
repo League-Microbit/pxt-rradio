@@ -124,6 +124,10 @@ namespace radiop {
             return undefined;
         }
 
+        dump(): string {
+            return "RadioPayload(type=" + this.packetType + ", serial=" + radiop.toHex(this.serial) + ")";
+        }
+
         send(): void {
             radio.sendBuffer(this.getBuffer());
         }
@@ -184,6 +188,10 @@ namespace radiop {
         switch (packetType) {
             case PayloadType.HERE_I_AM:
                 return radiop.HereIAm.fromBuffer(buffer);
+            case PayloadType.DISPLAY:
+                return radiop.DisplayPayload.fromBuffer(buffer);
+            case PayloadType.BOT_COMMAND:
+                return radiop.BotCommandPayload.fromBuffer(buffer);
             case PayloadType.BOT_STATUS:
                 return radiop.BotStatusPayload.fromBuffer(buffer);
         }
