@@ -10,18 +10,74 @@ namespace radiop {
     export const BROADCAST_GROUP: number = 1; // Default broadcast group for HereIAm messages
 
     export const CHANNEL_MIN = radiop.BROADCAST_CHANNEL + 1; // Minimum channel number
-    export const CHANNEL_MAX = 100; // Maximum channel number
+    export const CHANNEL_MAX = 83; // Maximum channel number
     export const GROUP_MIN = radiop.BROADCAST_GROUP + 1; // Minimum group number
     export const GROUP_MAX = 255; // Maximum group number
 
     let _group: number = radiop.BROADCAST_GROUP;
     let _channel: number = radiop.BROADCAST_CHANNEL;
 
-    let transmittingSerial: boolean = true;
     let initialized = false;
+    let _useStdHeader = false;
 
     let payloadHandler: (payload: RadioPayload) => void; // Handles any payload if no specific handler is set
 
+    function copyBuffer(src: Buffer, dst: Buffer) {
+        let len = Math.min(src.length, dst.length);
+        for (let i = 0; i < len; i++) {
+            dst.setNumber(NumberFormat.UInt8LE, i, src.getNumber(NumberFormat.UInt8LE, i));
+        }
+    }
+
+    export function useStdHeader(flag?: boolean): boolean {
+        if (flag !== undefined) {
+            _useStdHeader = !!flag;
+            radio.setTransmitSerialNumber(_useStdHeader);
+        }
+        return _useStdHeader;
+    }
+
+    export class RadioPacket {
+        data: Buffer;
+
+        constructor(size: number) {
+            this.data = control.createBuffer(size);
+            this.data.fill(0);
+        }
+
+
+        get signal() {
+            return this.data.getNumber(NumberFormat.Int32LE, this.data.length - 4);
+        }
+
+        get packetType() {
+            return this.data[0];
+        }
+
+        set packetType(val: number) {
+            this.data[0] = val & 0xff;
+        }
+
+        get time() {
+            return this.data.getNumber(NumberFormat.Int32LE, 1);
+        }
+
+        set time(val: number) {
+            this.data.setNumber(NumberFormat.Int32LE, 1, val);
+        }
+
+        get serial() {
+            return this.data.getNumber(NumberFormat.Int32LE, 5);
+        }
+
+        set serial(val: number) {
+            this.data.setNumber(NumberFormat.Int32LE, 5, val);
+        }
+
+        sendPacket() {
+            radio.sendRawPacket(this.data);
+        }
+    }
 
     export enum PayloadType {
         HERE_I_AM = 10,
@@ -68,7 +124,7 @@ namespace radiop {
         static readonly MAX_PACKET_SIZE = 19; // Max size of a radio buffer ( not the whole packet, which is 32 bytes )
 
 
-        public packet: radio.RadioPacket = undefined; 
+        public packet: RadioPacket = undefined; 
         protected buffer: Buffer;
         protected packetType: number;
 
@@ -129,7 +185,15 @@ namespace radiop {
         }
 
         send(): void {
-            radio.sendBuffer(this.getBuffer());
+            let buf = this.getBuffer();
+            let out = new RadioPacket(buf.length);
+            copyBuffer(buf, out.data);
+            out.packetType = this.packetType;
+            if (_useStdHeader) {
+                out.time = control.millis();
+                out.serial = control.deviceSerialNumber();
+            }
+            out.sendPacket();
         }
 
         /** Get the value (0/1) of a bit within a number stored at a byte offset in the payload buffer.
@@ -237,27 +301,33 @@ namespace radiop {
         initialized = true;
 
         // Initialize radio
-    // removed serial logging (initialized)
+        // removed serial logging (initialized)
         setGroup(group);
         setChannel(channel);
-        radio.setTransmitSerialNumber(true);
-        
+        useStdHeader(true);
+            
         if (power !== undefined) {
             radio.setTransmitPower(power);
         } else {
             radio.setTransmitPower(7);
         }
- 
+
         // Set up radio packet received handler
-        radio.onReceivedBuffer(function (buffer: Buffer) {
-            
+        radio.onDataReceived(function () {
+
+            let buffer: Buffer = radio.readRawPacket();
+
+            return;
+
             let payload = extractPayload(buffer);
 
             let packetType = buffer.getNumber(NumberFormat.UInt8LE, 0);
 
             if (!payload) return;
 
-            payload.packet = radio.lastPacket;
+            return
+
+            //payload.packet = RadioPacket.fromIncoming(buffer, radio.lastPacket);
             
             // Handler specific to the payload type
             let handler = payload.handler;

@@ -30,4 +30,7 @@ function testHereIAm() {
 }
 
 
-testHereIAm();
+// basic.showIcon(IconNames.Duck);
+// radiop.initDefaults();
+
+(new radiop.RadioRelay()).run();

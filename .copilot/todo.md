@@ -1,0 +1,1 @@
+- [x] Implement Python CLI `test/test_relay.py` providing `-l/--list` option to enumerate USB serial ports.

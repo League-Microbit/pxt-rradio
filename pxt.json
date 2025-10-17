@@ -10,8 +10,9 @@
         "main.ts",
         "src/radiop.ts",
         "src/botstate.ts",
-    "src/botcmd.ts",
-    "src/display.ts",
+        "src/botcmd.ts",
+        "src/display.ts",
+        "src/relay.ts",
         "src/negotiate.ts",
         "src/lib.ts",
         "README.md",
@@ -19,7 +20,7 @@
         "enums.d.ts"
     ],
     "testFiles": [
-        "test.ts"
+        "test/test.ts"
     ],
     "targetVersions": {
         "target": "8.0.16",
