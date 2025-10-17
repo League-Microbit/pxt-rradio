@@ -6,17 +6,22 @@ namespace radiop {
 
     export class DisplayPayload extends radiop.RadioPayload {
 
-        /**
-         * Buffer layout (size: 19 bytes):
-         * Byte 0   : Packet type (1 byte)
-         * Byte 1   : tone (UInt8LE, 1 byte)
-         * Byte 2   : duration (UInt8LE, 1 byte)
-         * Byte 3-6 : image (UInt32LE, 4 bytes, lower 25 bits used)
-         * Byte 7-18: Reserved/other payload (12 bytes)
-         *
-         * All values are packed at the lowest possible indices.
-         */
-        static readonly PACKET_SIZE: number = 19;
+    /**
+     * Buffer layout (size: 31 bytes):
+     * Byte 0   : Packet type (1 byte)
+     * Byte 1   : tone (UInt8LE, 1 byte)
+     * Byte 2   : duration (UInt8LE, 1 byte)
+     * Byte 3-6 : image (UInt32LE, 4 bytes, lower 25 bits used)
+     * Byte 7-18: Reserved/other payload (12 bytes)
+     * Byte 19-21: headLampLeft (24-bit color, 3 bytes)
+     * Byte 22-24: headLampRight (24-bit color, 3 bytes)
+     * Byte 25-27: neoLeft (24-bit color, 3 bytes)
+     * Byte 28-30: neoRight (24-bit color, 3 bytes)
+     *
+     * Color values are packed at the end of the buffer after image.
+     */
+    static readonly PACKET_SIZE: number = 31;
+
 
         constructor(buf?: Buffer) {
             super(radiop.PayloadType.DISPLAY, DisplayPayload.PACKET_SIZE);
@@ -61,6 +66,41 @@ namespace radiop {
         setImage(img: Image) { if (img) this.image = radiop.imageToInt(img); }
         /** Get image decoded as 5x5 Image */
         getImage(): Image { return radiop.intToImage(this.image); }
+
+                /**
+         * Set a 24-bit color value at the given position (buffer offset).
+         * @param position Buffer offset (start byte)
+         * @param value 32-bit int, only lower 24 bits used
+         */
+        setColor(position: number, value: number) {
+            this.buffer.setNumber(NumberFormat.UInt8LE, position, (value >> 16) & 0xFF);
+            this.buffer.setNumber(NumberFormat.UInt8LE, position + 1, (value >> 8) & 0xFF);
+            this.buffer.setNumber(NumberFormat.UInt8LE, position + 2, value & 0xFF);
+        }
+
+        /**
+         * Get a 24-bit color value from the given position (buffer offset).
+         * @param position Buffer offset (start byte)
+         * @returns 32-bit int, only lower 24 bits used
+         */
+        getColor(position: number): number {
+            return ((this.buffer.getNumber(NumberFormat.UInt8LE, position) << 16) |
+                    (this.buffer.getNumber(NumberFormat.UInt8LE, position + 1) << 8) |
+                    (this.buffer.getNumber(NumberFormat.UInt8LE, position + 2)) ) >>> 0;
+        }
+
+    // Headlamp and NeoPixel color accessors (packed after image)
+    get headLampLeft(): number { return this.getColor(7); }
+    set headLampLeft(v: number) { this.setColor(7, v); }
+
+    get headLampRight(): number { return this.getColor(10); }
+    set headLampRight(v: number) { this.setColor(10, v); }
+
+    get neoLeft(): number { return this.getColor(13); }
+    set neoLeft(v: number) { this.setColor(13, v); }
+
+    get neoRight(): number { return this.getColor(16); }
+    set neoRight(v: number) { this.setColor(16, v); }
 
         get payloadLength() { return DisplayPayload.PACKET_SIZE; }
 

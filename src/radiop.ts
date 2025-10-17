@@ -182,8 +182,6 @@ namespace radiop {
         let packetType = buffer.getNumber(NumberFormat.UInt8LE, 0);
 
         switch (packetType) {
-            case PayloadType.DISPLAY:
-                return radiop.DisplayPayload.fromBuffer(buffer);
             case PayloadType.HERE_I_AM:
                 return radiop.HereIAm.fromBuffer(buffer);
             case PayloadType.BOT_STATUS:
