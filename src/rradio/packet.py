@@ -83,7 +83,7 @@ def _split_color(value: int) -> tuple[int, int, int]:
 
 class BotCommandPacket(RadioPacket):
 	PACKET_TYPE: ClassVar[int] = PayloadType.BOT_COMMAND
-	PAYLOAD_STRUCT: ClassVar[struct.Struct] = struct.Struct("<Bhhhhh")
+	PAYLOAD_STRUCT: ClassVar[struct.Struct] = struct.Struct("<Bhhhhhhhi")
 	TOTAL_SIZE: ClassVar[int] = RadioPacket.HEADER_SIZE + PAYLOAD_STRUCT.size
 
 	def __init__(
@@ -96,6 +96,9 @@ class BotCommandPacket(RadioPacket):
 		motor3: int = 0,
 		motor4: int = 0,
 		duration: int = 0,
+		servo1: int = 0,
+		servo2: int = 0,
+		data1: int = 0,
 		time: int = 0,
 		serial: int = 0,
 	) -> None:
@@ -108,7 +111,17 @@ class BotCommandPacket(RadioPacket):
 					f"BotCommand packet must be {self.TOTAL_SIZE} bytes, got {len(data)}"
 				)
 			values = self.PAYLOAD_STRUCT.unpack_from(memoryview(data), self.HEADER_SIZE)
-			command_type, motor1, motor2, motor3, motor4, duration = values
+			(
+				command_type,
+				motor1,
+				motor2,
+				motor3,
+				motor4,
+				duration,
+				servo1,
+				servo2,
+				data1,
+			) = values
 		super().__init__(int(self.PACKET_TYPE), time, serial)
 		self.command_type = int(command_type) & 0xFF
 		self.motor1 = int(motor1)
@@ -116,6 +129,9 @@ class BotCommandPacket(RadioPacket):
 		self.motor3 = int(motor3)
 		self.motor4 = int(motor4)
 		self.duration = int(duration)
+		self.servo1 = int(servo1)
+		self.servo2 = int(servo2)
+		self.data1 = int(data1)
 
 	def payload_bytes(self) -> bytes:
 		return self.PAYLOAD_STRUCT.pack(
@@ -125,6 +141,9 @@ class BotCommandPacket(RadioPacket):
 			self.motor3,
 			self.motor4,
 			self.duration,
+			self.servo1,
+			self.servo2,
+			self.data1,
 		)
 
 	@classmethod

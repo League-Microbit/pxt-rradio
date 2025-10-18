@@ -240,14 +240,23 @@ namespace radiop {
         }
 
         // Short numeric accessors to reduce repetition and possibly flash size
-        u16(off: number): number { return this.data.getNumber(NumberFormat.UInt16LE, this.payloadOffset(off)); }
-        su16(off: number, v: number) { this.data.setNumber(NumberFormat.UInt16LE, this.payloadOffset(off), v & 0xffff); }
-        i16(off: number): number { return this.data.getNumber(NumberFormat.Int16LE, this.payloadOffset(off)); }
-        si16(off: number, v: number) { this.data.setNumber(NumberFormat.Int16LE, this.payloadOffset(off), v); }
-
         u8(off: number): number { return this.data.getNumber(NumberFormat.UInt8LE, this.payloadOffset(off)); }
         su8(off: number, v: number) { this.data.setNumber(NumberFormat.UInt8LE, this.payloadOffset(off), v & 0xff); }
 
+        u16(off: number): number { return this.data.getNumber(NumberFormat.UInt16LE, this.payloadOffset(off)); }
+        su16(off: number, v: number) { this.data.setNumber(NumberFormat.UInt16LE, this.payloadOffset(off), v & 0xffff); }
+
+        i16(off: number): number { return this.data.getNumber(NumberFormat.Int16LE, this.payloadOffset(off)); }
+        si16(off: number, v: number) { this.data.setNumber(NumberFormat.Int16LE, this.payloadOffset(off), v); }
+
+        u32(off: number): number { return this.data.getNumber(NumberFormat.UInt32LE, this.payloadOffset(off)); }
+        su32(off: number, v: number) { this.data.setNumber(NumberFormat.UInt32LE, this.payloadOffset(off), v >>> 0); }
+
+        i32(off: number): number { return this.data.getNumber(NumberFormat.Int32LE, this.payloadOffset(off)); }
+        si32(off: number, v: number) { this.data.setNumber(NumberFormat.Int32LE, this.payloadOffset(off), v | 0); }
+
+        f32(off: number): number { return this.data.getNumber(NumberFormat.Float32LE, this.payloadOffset(off)); }
+        sf32(off: number, v: number) { this.data.setNumber(NumberFormat.Float32LE, this.payloadOffset(off), v); }
 
     }
 

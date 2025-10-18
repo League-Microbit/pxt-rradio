@@ -30,17 +30,17 @@ namespace radiop {
                 const buffer = radio.readRawPacket();
                 const hex = buffer.toHex();
 
-                serial.writeLine(CMD_RECEIVE + " " + hex);
-
-               
-
                 if (self.echoMode) {
                     radio.sendRawPacket(buffer);
-                    serial.writeLine("e: " + hex);
+                    
                     const payload = radiop.extractPayload(buffer);
                     if (payload) {
                         serial.writeLine("p: " + payload.dump());
+                    } else {
+                        serial.writeLine("e: " + hex);
                     }
+                } else {
+                    serial.writeLine(CMD_RECEIVE + " " + hex);
                 }
             });
         }

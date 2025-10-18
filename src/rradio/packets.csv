@@ -8,6 +8,9 @@ BotCommandPayload,motor2,int16,2,3
 BotCommandPayload,motor3,int16,2,5
 BotCommandPayload,motor4,int16,2,7
 BotCommandPayload,duration,int16,2,9
+BotCommandPayload,servo1,int16,2,11
+BotCommandPayload,servo2,int16,2,13
+BotCommandPayload,data1,int32,4,15
 BotStatusPayload,buttons,uint8,1,0
 BotStatusPayload,accelX,int16,2,1
 BotStatusPayload,accelY,int16,2,3

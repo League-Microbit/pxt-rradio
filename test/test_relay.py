@@ -2,12 +2,9 @@ import os
 import random
 import sys
 import time
-from typing import Dict, Iterable, Optional, Sequence, Tuple, Type
+from typing import Dict, Optional, Sequence, Tuple, Type, Union
 
 import click
-import serial
-from serial.tools import list_ports
-from serial.tools.list_ports_common import ListPortInfo
 
 from rradio.packet import (
     BotCommandPacket,
@@ -15,7 +12,14 @@ from rradio.packet import (
     DisplayPacket,
     HereIAmPacket,
     RadioPacket,
-    parse_hex,
+    parse_packet,
+)
+from rradio.rrserial import (
+    CMD_RECEIVE,
+    CMD_SEND,
+    RRSerial,
+    render_port_table,
+    usb_serial_ports,
 )
 
 
@@ -23,8 +27,6 @@ DEFAULT_COUNT = 10
 DEFAULT_INTERVAL = .25
 PACKET_SIZE = 32
 RESPONSE_TIMEOUT = 2.0
-CMD_SEND = "s:"
-CMD_RECEIVE = "r:"
 
 
 StructuredPacketInfo = Tuple[
@@ -46,6 +48,9 @@ STRUCTURED_PACKET_CLASSES: Sequence[StructuredPacketInfo] = (
             "motor3",
             "motor4",
             "duration",
+            "servo1",
+            "servo2",
+            "data1",
         ),
     ),
     (
@@ -90,49 +95,6 @@ STRUCTURED_PACKET_CLASSES: Sequence[StructuredPacketInfo] = (
     ),
 )
 
-
-def usb_serial_ports() -> Iterable[ListPortInfo]:
-    for port in list_ports.comports():
-        if port.vid is None:
-            continue
-        yield port
-
-
-def resolve_device(path: Optional[str]) -> Optional[str]:
-    if path:
-        return path
-
-    ports = list(usb_serial_ports())
-    if not ports:
-        click.echo("No USB serial ports detected. Use --device to select one.", err=True)
-        return None
-
-    click.echo("Available USB serial ports:")
-    render_port_table(ports)
-
-    for port in ports:
-        text = " ".join(
-            filter(
-                None,
-                [
-                    port.description,
-                    getattr(port, "product", None),
-                    getattr(port, "manufacturer", None),
-                    port.name,
-                ],
-            )
-        )
-        if "micro:bit" in text.lower():
-            click.echo(f"Selecting {port.device}")
-            return port.device
-
-    click.echo(
-        "No micro:bit device detected. Use --device to choose one.",
-        err=True,
-    )
-    return None
-
-
 def random_int32() -> int:
     return random.randint(-(1 << 31), (1 << 31) - 1)
 
@@ -168,26 +130,42 @@ def generate_payload(index: int, randomize: bool) -> bytes:
     data[3] = (index >> 24) & 0xFF
     return bytes(data)
 
+def log_event(command: str, data: Union[bytes, str]) -> None:
+    if command == "r" and isinstance(data, bytes):
+        click.echo(f"<< {CMD_RECEIVE} {data.hex()}")
+    elif isinstance(data, str):
+        if command == "log":
+            click.echo(f"<< {data}")
+        else:
+            click.echo(f"<< {command.upper()}: {data}")
+    else:
+        click.echo(f"<< {command}: {data}")
 
-def pump_serial(port: serial.Serial, duration: float) -> None:
+
+def pump_serial(relay: RRSerial, duration: float) -> None:
     if duration <= 0:
         duration = 0
-    deadline = time.monotonic() + duration
-    while True:
-        line = port.readline()
-        if line:
-            text = line.decode("utf-8", errors="replace").rstrip("\r\n")
-            if text:
-                click.echo(f"<< {text}")
-            continue
+    for command, data in relay.iter(timeout=duration):
+        log_event(command, data)
 
-        if time.monotonic() >= deadline:
-            break
-    time.sleep(0.05)
+
+def wait_for_response(relay: RRSerial, command: str, timeout: float) -> Optional[bytes]:
+    for cmd, data in relay.iter(timeout=timeout):
+        log_event(cmd, data)
+        if cmd == command:
+            if isinstance(data, bytes):
+                return data
+            if isinstance(data, str):
+                cleaned = data.replace(" ", "")
+                try:
+                    return bytes.fromhex(cleaned)
+                except ValueError:
+                    return None
+    return None
 
 
 def send_packets(
-    port: serial.Serial,
+    relay: RRSerial,
     count: int,
     interval: float,
     randomize: bool,
@@ -197,43 +175,20 @@ def send_packets(
         f"Sending {count} packet(s) every {interval:.3f}s with "
         f"{'random' if randomize else 'pattern'} payloads."
     )
-    pump_serial(port, 0.2)
-
+    pump_serial(relay, 0.2)
 
     for index in range(count):
         if words:
             payload_hex = words + words
+            command_text = relay.send(payload_hex)
         else:
             payload = generate_payload(index, randomize)
-            payload_hex = payload.hex()
+            command_text = relay.send(payload)
 
-        command = f"{CMD_SEND} {payload_hex}"
-        port.write(command.encode("ascii") + b"\n")
-        port.flush()
-        click.echo(f">> {command}")
+        click.echo(f">> {command_text}")
 
         wait = interval if index < count - 1 else 0.5
-        pump_serial(port, wait)
-
-
-def wait_for_response(port: serial.Serial, prefix: str, timeout: float) -> Optional[str]:
-    deadline = time.monotonic() + timeout
-    while True:
-        if time.monotonic() >= deadline:
-            return None
-        line = port.readline()
-        if not line:
-            time.sleep(0.05)
-            continue
-        text = line.decode("utf-8", errors="replace").rstrip("\r\n")
-        if not text:
-            continue
-        click.echo(f"<< {text}")
-        if text.startswith(prefix):
-            _, _, rest = text.partition(" ")
-            if rest:
-                return rest.strip() or None
-            return text[len(prefix):].strip() or None
+        pump_serial(relay, wait)
 
 
 def random_structured_packet(packet_cls: Type[RadioPacket]) -> RadioPacket:
@@ -245,6 +200,9 @@ def random_structured_packet(packet_cls: Type[RadioPacket]) -> RadioPacket:
             motor3=random_int16(),
             motor4=random_int16(),
             duration=random_int16(),
+            servo1=random_int16(),
+            servo2=random_int16(),
+            data1=random_int32(),
             time=random_int32(),
             serial=random_int32(),
         )
@@ -296,30 +254,28 @@ def compare_packet_fields(
     return mismatches
 
 
-def send_structured_packets(port: serial.Serial, count: int, interval: float) -> None:
+def send_structured_packets(relay: RRSerial, count: int, interval: float) -> None:
     click.echo(
         f"Sending structured packets for {count} iteration(s), "
         "covering all known payload types."
     )
-    pump_serial(port, 0.2)
+    pump_serial(relay, 0.2)
 
     for iteration in range(count):
         click.echo(f"Iteration {iteration + 1}/{count}")
         for packet_cls, fields in STRUCTURED_PACKET_CLASSES:
             packet = random_structured_packet(packet_cls)
             payload_hex = packet.to_hex()
-            command = f"{CMD_SEND} {payload_hex}"
-            port.write(command.encode("ascii") + b"\n")
-            port.flush()
-            click.echo(f">> {command}")
+            command_text = relay.send(packet.to_bytes())
+            click.echo(f">> {command_text}")
 
-            response_hex = wait_for_response(port, CMD_RECEIVE, RESPONSE_TIMEOUT)
-            if response_hex is None:
+            response_bytes = wait_for_response(relay, "r", RESPONSE_TIMEOUT)
+            if response_bytes is None:
                 raise click.ClickException(
                     f"Timed out waiting for echoed packet for {packet_cls.__name__}."
                 )
 
-            received = parse_hex(response_hex)
+            received = parse_packet(response_bytes)
             if not isinstance(received, packet_cls):
                 raise click.ClickException(
                     f"Expected {packet_cls.__name__} echo, got {type(received).__name__}."
@@ -339,22 +295,6 @@ def send_structured_packets(port: serial.Serial, count: int, interval: float) ->
 
             if interval > 0:
                 time.sleep(interval)
-
-
-def render_port_table(ports: Iterable[ListPortInfo]) -> None:
-    ports = list(ports)
-    if not ports:
-        click.echo("No USB serial ports found.")
-        return
-
-    header = f"{'Path':<24} {'Name':<12} Description"
-    click.echo(header)
-    click.echo("-" * len(header))
-    for port in ports:
-        name = port.name or "-"
-        description = port.description or "-"
-        click.echo(f"{port.device:<24} {name:<12} {description}")
-
 
 @click.command()
 @click.option(
@@ -413,7 +353,7 @@ def main(
     packets: bool,
 ) -> None:
 
-    hex_words= 'deadbeefcafefoodbabe8badf00dd00dface'
+    hex_words = "deadbeefcafefoodbabe8badf00dd00dface"
 
     if list_only:
         render_port_table(usb_serial_ports())
@@ -431,25 +371,20 @@ def main(
         click.echo("--packets may not be combined with --rand or --words.", err=True)
         sys.exit(2)
 
-    resolved = resolve_device(device)
-    if not resolved:
-        sys.exit(2)
-
     try:
-        with serial.Serial(resolved, baudrate=115200, timeout=0.1) as port:
-            click.echo(f"Opened {resolved} @ {port.baudrate} baud")
-            port.reset_input_buffer()
+        with RRSerial(device) as relay:
+            click.echo(f"Opened {relay.device_path} @ {relay.baudrate} baud")
+            relay.reset_input_buffer()
             if packets:
-                send_structured_packets(port, count, interval)
+                send_structured_packets(relay, count, interval)
             else:
-                send_packets(port, count, interval, rand, hex_words if words else None)
-    except serial.SerialException as exc:  # pragma: no cover - hardware dependent
+                send_packets(relay, count, interval, rand, hex_words if words else None)
+    except click.ClickException as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(2)
+    except Exception as exc:  # pragma: no cover - hardware dependent
         click.echo(f"Failed to open serial port: {exc}", err=True)
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
