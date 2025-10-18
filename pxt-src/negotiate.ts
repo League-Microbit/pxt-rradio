@@ -50,7 +50,7 @@ namespace radiop {
     //  Bytes8-11: image (u32)
     export class HereIAm extends radiop.RadioPayload {
 
-    static readonly PACKET_SIZE = RadioPacket.HEADER_SIZE + 11;
+        static readonly PACKET_SIZE = RadioPacket.HEADER_SIZE + 11;
         private static readonly OFFSET_CLASS_ID = 0;
         private static readonly OFFSET_GROUP = 1;
         private static readonly OFFSET_CHANNEL = 3;
@@ -80,12 +80,7 @@ namespace radiop {
 
 
         dump(): string {
-            return "HereIAm(serial=" + radiop.toHex(this.serial) +
-                ", classId=" + this.classId +
-                ", group=" + this.group +
-                ", channel=" + this.channel +
-                ", flags=" + this.flags
-                ")";
+            return "HereIAm " + this.data.toHex();
         }
 
         get handler(): (payload: HereIAm) => void { return _onReceiveHandler; }

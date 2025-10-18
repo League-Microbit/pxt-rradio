@@ -43,10 +43,7 @@ namespace radiop {
     set accelZ(v: number) { this.si16(BotStatusPayload.OFFSET_ACCEL_Z, v); }
 
         dump(): string {
-            return "BotStatusPayload(serial=" + radiop.toHex(this.serial) +
-                ", buttons=" + this.buttons +
-                ", accel=[" + this.accelX + "," + this.accelY + "," + this.accelZ + "]" +
-                ")";
+            return "BotStatusPayload " + this.data.toHex();
         }
 
         get handler(): (payload: radiop.RadioPayload) => void {

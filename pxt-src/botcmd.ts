@@ -19,9 +19,9 @@ namespace radiop {
         private static readonly OFFSET_MOTOR3 = 5;
         private static readonly OFFSET_MOTOR4 = 7;
         private static readonly OFFSET_DURATION = 9;
-            private static readonly OFFSET_SERVO1 = 11;
-            private static readonly OFFSET_SERVO2 = 13;
-            private static readonly OFFSET_DATA1 = 15;
+        private static readonly OFFSET_SERVO1 = 11;
+        private static readonly OFFSET_SERVO2 = 13;
+        private static readonly OFFSET_DATA1 = 15;
 
         constructor(buf?: Buffer) {
             super(radiop.PayloadType.BOT_COMMAND, BotCommandPayload.PACKET_SIZE);
@@ -64,13 +64,7 @@ namespace radiop {
         set data1(v: number) { this.data.setNumber(NumberFormat.Int32LE, this.payloadOffset(BotCommandPayload.OFFSET_DATA1), v); }
 
         dump(): string {
-            return "BotCommandPayload(serial=" + radiop.toHex(this.serial) +
-                ", type=" + this.commandType +
-                ", motors=[" + this.motor1 + "," + this.motor2 + "," + this.motor3 + "," + this.motor4 + "]" +
-                ", duration=" + this.duration +
-                ", servos=[" + this.servo1 + "," + this.servo2 + "]" +
-                ", data1=" + this.data1 +
-                ")";
+            return "BotCommandPayload " + this.data.toHex();
         }
 
         get payloadLength() { return BotCommandPayload.PACKET_SIZE; }

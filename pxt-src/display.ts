@@ -132,13 +132,7 @@ namespace radiop {
         }
 
         dump(): string {
-            return "DisplayPayload(serial=" + radiop.toHex(this.serial) +
-                ", tone=" + this.tone +
-                ", duration=" + this.duration +
-                ", image=" + radiop.toHex(this.image) +
-                ", lamps=[" + this.colorToHex(this.headLampLeft) + "," + this.colorToHex(this.headLampRight) +
-                "," + this.colorToHex(this.neoLeft) + "," + this.colorToHex(this.neoRight) + "]" +
-                ")";
+            return "DisplayPayload " + this.data.toHex();
         }
 
     get payloadLength() { return DisplayPayload.PACKET_SIZE - this.BYTE_POS_PAYLOAD_START; }

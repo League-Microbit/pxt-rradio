@@ -1,3 +1,10 @@
+/*
+The RadioRelay reads messages from the serial port and send them over the radio. 
+
+It also has an Echo mode for testing: when Echo mode is on, any received 
+radio message is sent back out immediately, and payloads are dumped to serial.
+*/
+
 namespace radiop {
 
     const CMD_SEND = "s:";
@@ -7,13 +14,16 @@ namespace radiop {
     export class RadioRelay {
         private running = false;
         private echoMode = false;
+        private chatterMode = false;
+        private chatterDeadline = 0;
 
         constructor() {
             radiop.initDefaults();
             radiop.useStdHeader(false);
-            basic.showIcon(IconNames.Target);
+            this.updateStatusIcon();
             serial.setRxBufferSize(128);
             serial.setTxBufferSize(128);
+            serial.writeLine("RadioRelay");
         }
 
         run() {
@@ -22,6 +32,7 @@ namespace radiop {
             this.registerRadioHook();
             control.inBackground(() => this.loop());
             input.onButtonPressed(Button.A, () => this.toggleEcho());
+            input.onButtonPressed(Button.B, () => this.toggleChatter());
         }
 
         private registerRadioHook() {
@@ -29,24 +40,26 @@ namespace radiop {
             radio.onDataReceived(function () {
                 const buffer = radio.readRawPacket();
                 const hex = buffer.toHex();
+                serial.writeLine(CMD_RECEIVE + " " + hex);
 
-                if (self.echoMode) {
-                    radio.sendRawPacket(buffer);
+                const payload = radiop.extractPayload(buffer);
+                if (payload) {
                     
-                    const payload = radiop.extractPayload(buffer);
-                    if (payload) {
-                        serial.writeLine("p: " + payload.dump());
+                    if (self.echoMode) {
+                        radio.sendRawPacket(buffer);
+                        serial.writeLine("e: " + payload.dump());
+
                     } else {
-                        serial.writeLine("e: " + hex);
+                        serial.writeLine("p: " + payload.dump());
+
                     }
-                } else {
-                    serial.writeLine(CMD_RECEIVE + " " + hex);
-                }
+                } 
             });
         }
 
         private loop() {
             while (this.running) {
+                this.maybeSendChatter();
                 const line = serial.readLine();
 
                 if (!line) {
@@ -109,7 +122,54 @@ namespace radiop {
 
         private toggleEcho() {
             this.echoMode = !this.echoMode;
-            basic.showIcon(this.echoMode ? IconNames.Duck : IconNames.Target);
+            this.chatterMode = false;
+            serial.writeLine("Echo mode: " + (this.echoMode ? "ON" : "OFF"));
+            this.updateStatusIcon();
+        }
+
+        private toggleChatter() {
+            this.chatterMode = !this.chatterMode;
+            this.echoMode = false;
+            if (this.chatterMode) {
+                this.chatterDeadline = 0;
+            }
+            serial.writeLine("Chatter mode: " + (this.chatterMode ? "ON" : "OFF"));
+            this.updateStatusIcon();
+        }
+
+        private updateStatusIcon() {
+            if (this.chatterMode) {
+                basic.showString("C");
+            } else if (this.echoMode) {
+                basic.showString("E");
+            } else {
+                basic.showIcon(IconNames.Target);
+            }
+        }
+
+        private maybeSendChatter() {
+            if (!this.chatterMode) return;
+            const now = control.millis();
+            if (now < this.chatterDeadline) return;
+            this.chatterDeadline = now + 3000;
+            
+            const pick = randint(0, 3);
+            let packetType: PayloadType;
+            if (pick == 0) packetType = PayloadType.HERE_I_AM;
+            else if (pick == 1) packetType = PayloadType.DISPLAY;
+            else if (pick == 2) packetType = PayloadType.BOT_COMMAND;
+            else packetType = PayloadType.BOT_STATUS;
+
+            const packet = radiop.newPacketByType(packetType);
+            if (!packet) return;
+
+            const buf = packet.getBuffer();
+            for (let i = 1; i < buf.length; i++) {
+                buf[i] = randint(0, 255);
+            }
+
+            packet.send();
+            serial.writeLine("P: " + packet.dump());
         }
     }
 

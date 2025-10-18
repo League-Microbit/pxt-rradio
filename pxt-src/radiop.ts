@@ -93,6 +93,20 @@ namespace radiop {
 
     }
 
+    export function newPacketByType(packetType: PayloadType): RadioPayload {
+        switch (packetType) {
+            case radiop.PayloadType.HERE_I_AM:
+                return new radiop.HereIAm();
+            case radiop.PayloadType.DISPLAY:
+                return new radiop.DisplayPayload();
+            case radiop.PayloadType.BOT_COMMAND:
+                return new radiop.BotCommandPayload();
+            case radiop.PayloadType.BOT_STATUS:
+                return new radiop.BotStatusPayload();
+        }
+        return undefined;
+    }
+
     export function setGroup(group: number) {
         if (group != _group) {
             _group = group;
@@ -193,7 +207,7 @@ namespace radiop {
         }
 
         dump(): string {
-            return "RadioPayload(type=" + this.packetType + ", serial=" + radiop.toHex(this.serial) + ")";
+            return "RadioPayload " + this.data.toHex();
         }
 
         send(): void {
