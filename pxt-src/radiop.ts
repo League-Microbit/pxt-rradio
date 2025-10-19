@@ -89,7 +89,8 @@ namespace radiop {
         HERE_I_AM = 10,
         DISPLAY = 11,
         BOT_COMMAND = 20,
-        BOT_STATUS = 21
+        BOT_STATUS = 21,
+        JOYSTICK = 30
 
     }
 
@@ -103,6 +104,8 @@ namespace radiop {
                 return new radiop.BotCommandPayload();
             case radiop.PayloadType.BOT_STATUS:
                 return new radiop.BotStatusPayload();
+            case radiop.PayloadType.JOYSTICK:
+                return new radiop.JoystickPayload();
         }
         return undefined;
     }

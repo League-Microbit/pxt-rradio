@@ -12,6 +12,7 @@ class PayloadType(IntEnum):
 	DISPLAY = 11
 	BOT_COMMAND = 20
 	BOT_STATUS = 21
+	JOYSTICK = 30
 
 
 class RadioPacket:
@@ -382,11 +383,81 @@ class HereIAmPacket(RadioPacket):
 		return cls(data)
 
 
+class JoystickPacket(RadioPacket):
+	"""Joystick input packet with XY position, buttons, and accelerometer data."""
+
+	PACKET_TYPE: ClassVar[int] = PayloadType.JOYSTICK
+	PAYLOAD_STRUCT: ClassVar[struct.Struct] = struct.Struct("<HHBhhh")
+	TOTAL_SIZE: ClassVar[int] = RadioPacket.HEADER_SIZE + PAYLOAD_STRUCT.size
+
+	def __init__(
+		self,
+		data: Optional[bytes] = None,
+		*,
+		x: int = 0,
+		y: int = 0,
+		buttons: int = 0,
+		accel_x: int = 0,
+		accel_y: int = 0,
+		accel_z: int = 0,
+		time: int = 0,
+		serial: int = 0,
+	) -> None:
+		if data is not None:
+			packet_type, time, serial = self._parse_header(data)
+			if packet_type != self.PACKET_TYPE:
+				raise ValueError("Not a Joystick packet")
+			if len(data) != self.TOTAL_SIZE:
+				raise ValueError(
+					f"Joystick packet must be {self.TOTAL_SIZE} bytes, got {len(data)}"
+				)
+			values = self.PAYLOAD_STRUCT.unpack_from(memoryview(data), self.HEADER_SIZE)
+			x, y, buttons, accel_x, accel_y, accel_z = values
+		super().__init__(int(self.PACKET_TYPE), time, serial)
+		self.x = int(x) & 0xFFFF
+		self.y = int(y) & 0xFFFF
+		self.buttons = int(buttons) & 0xFF
+		self.accel_x = int(accel_x)
+		self.accel_y = int(accel_y)
+		self.accel_z = int(accel_z)
+
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.extend([
+			("x", self.x),
+			("y", self.y),
+			("buttons", f"0x{self.buttons:02x}"),
+			("accel_x", self.accel_x),
+			("accel_y", self.accel_y),
+			("accel_z", self.accel_z),
+		])
+		return items
+
+	def payload_bytes(self) -> bytes:
+		return self.PAYLOAD_STRUCT.pack(
+			self.x & 0xFFFF,
+			self.y & 0xFFFF,
+			self.buttons & 0xFF,
+			self.accel_x,
+			self.accel_y,
+			self.accel_z,
+		)
+
+	@classmethod
+	def from_bytes(cls, data: bytes) -> "JoystickPacket":
+		return cls(data)
+
+	def button_pressed(self, button: int) -> bool:
+		"""Check if a specific button is pressed."""
+		return (self.buttons & (1 << button)) != 0
+
+
 PACKET_CLASSES: Dict[int, Type[RadioPacket]] = {
 	int(PayloadType.BOT_COMMAND): BotCommandPacket,
 	int(PayloadType.BOT_STATUS): BotStatusPacket,
 	int(PayloadType.DISPLAY): DisplayPacket,
 	int(PayloadType.HERE_I_AM): HereIAmPacket,
+	int(PayloadType.JOYSTICK): JoystickPacket,
 }
 
 
@@ -422,6 +493,7 @@ __all__ = [
 	"BotStatusPacket",
 	"DisplayPacket",
 	"HereIAmPacket",
+	"JoystickPacket",
 	"parse_packet",
 	"parse_hex",
 ]

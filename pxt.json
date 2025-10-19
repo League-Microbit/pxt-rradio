@@ -11,6 +11,7 @@
         "pxt-src/botstate.ts",
         "pxt-src/botcmd.ts",
         "pxt-src/display.ts",
+        "pxt-src/joystick.ts",
         "pxt-src/relay.ts",
         "pxt-src/negotiate.ts",
         "pxt-src/lib.ts",

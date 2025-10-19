@@ -26,3 +26,9 @@ HereIAm,classId,uint8,1,0
 HereIAm,group,uint16,2,1
 HereIAm,channel,uint16,2,3
 HereIAm,flags,uint16,2,5
+JoystickPayload,x,uint16,2,0
+JoystickPayload,y,uint16,2,2
+JoystickPayload,buttons,uint8,1,4
+JoystickPayload,accelX,int16,2,5
+JoystickPayload,accelY,int16,2,7
+JoystickPayload,accelZ,int16,2,9

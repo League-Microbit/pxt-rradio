@@ -153,7 +153,7 @@ namespace radiop {
             while (true) {
                 if (_runBeacon) {
                     let hereIAm = newHereIAm(); 
-                    serial.writeLine("Beacon: ch=" + hereIAm.channel + " grp=" + hereIAm.group);
+
                     hereIAm.send(); // Send to my private radio
                     if (lastChannel !== radiop.getChannel() || lastGroup !== radiop.getGroup() || bCountDown <= 0) {
                         lastChannel = radiop.getChannel();

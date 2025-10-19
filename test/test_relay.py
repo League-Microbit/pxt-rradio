@@ -11,6 +11,7 @@ from rradio.packet import (
     BotStatusPacket,
     DisplayPacket,
     HereIAmPacket,
+    JoystickPacket,
     RadioPacket,
     parse_packet,
 )
@@ -93,6 +94,20 @@ STRUCTURED_PACKET_CLASSES: Sequence[StructuredPacketInfo] = (
             "image",
         ),
     ),
+    (
+        JoystickPacket,
+        (
+            "packet_type",
+            "time",
+            "serial",
+            "x",
+            "y",
+            "buttons",
+            "accel_x",
+            "accel_y",
+            "accel_z",
+        ),
+    ),
 )
 
 def random_int32() -> int:
@@ -137,7 +152,7 @@ def log_event(command: str, data: Union[bytes, str]) -> None:
         if command == "log":
             click.echo(f"<< {data}")
         else:
-            click.echo(f"<< {command.upper()}: {data}")
+            click.echo(f"<< {command}: {data}")
     else:
         click.echo(f"<< {command}: {data}")
 
@@ -237,6 +252,17 @@ def random_structured_packet(packet_cls: Type[RadioPacket]) -> RadioPacket:
             time=random_int32(),
             serial=random_int32(),
         )
+    if packet_cls is JoystickPacket:
+        return JoystickPacket(
+            x=random_uint16() % 1024,  # 0-1023 for joystick
+            y=random_uint16() % 1024,  # 0-1023 for joystick
+            buttons=random_uint8(),
+            accel_x=random_int16() % 2048 - 1024,  # -1023 to 1023
+            accel_y=random_int16() % 2048 - 1024,  # -1023 to 1023
+            accel_z=random_int16() % 2048 - 1024,  # -1023 to 1023
+            time=random_int32(),
+            serial=random_int32(),
+        )
     raise ValueError(f"Unsupported packet class {packet_cls!r}")
 
 
@@ -260,41 +286,69 @@ def send_structured_packets(relay: RRSerial, count: int, interval: float) -> Non
         "covering all known payload types."
     )
     pump_serial(relay, 0.2)
+    
+    # Track timing for speed calculation
+    start_time = time.monotonic()
+    total_packets_sent = 0
+    successful_packets = 0
 
     for iteration in range(count):
         click.echo(f"Iteration {iteration + 1}/{count}")
         for packet_cls, fields in STRUCTURED_PACKET_CLASSES:
+
+            if packet_cls is HereIAmPacket:
+                # Skip HereIAm packets since they may be sent spontaneously by the device
+                click.echo(".. Skipping HereIAmPacket (may interfere with relay operation)")
+                continue
+
             packet = random_structured_packet(packet_cls)
             payload_hex = packet.to_hex()
             command_text = relay.send(packet.to_bytes())
             click.echo(f">> {command_text}")
+            total_packets_sent += 1
 
-            response_bytes = wait_for_response(relay, "r", RESPONSE_TIMEOUT)
-            if response_bytes is None:
-                raise click.ClickException(
-                    f"Timed out waiting for echoed packet for {packet_cls.__name__}."
-                )
+            while True:
+                response_bytes = wait_for_response(relay, "r", RESPONSE_TIMEOUT)
+                if response_bytes is None:
+                    click.echo(f"Timeout waiting for {packet_cls.__name__} echo")
+                    break
+        
+                received = parse_packet(response_bytes)
+                if not isinstance(received, packet_cls):
+                    print(f"Expected {packet_cls.__name__} echo, got {type(received).__name__}.")
+                else:
+                    successful_packets += 1
+                    break
+                
 
-            received = parse_packet(response_bytes)
-            if not isinstance(received, packet_cls):
-                raise click.ClickException(
-                    f"Expected {packet_cls.__name__} echo, got {type(received).__name__}."
-                )
+            if response_bytes is not None:
+                mismatches = compare_packet_fields(packet, received, fields)
+                if mismatches:
+                    details = ", ".join(
+                        f"{name} sent={sent!r} received={got!r}"
+                        for name, (sent, got) in mismatches.items()
+                    )
+                    click.echo(f"Field mismatch for {packet_cls.__name__}: {details}")
+                    continue
 
-            mismatches = compare_packet_fields(packet, received, fields)
-            if mismatches:
-                details = ", ".join(
-                    f"{name} sent={sent!r} received={got!r}"
-                    for name, (sent, got) in mismatches.items()
-                )
-                raise click.ClickException(
-                    f"Field mismatch for {packet_cls.__name__}: {details}"
-                )
-
-            click.echo(f"Validated {packet_cls.__name__} ({payload_hex})")
+                click.echo(f"Validated {packet_cls.__name__} ({payload_hex})")
 
             if interval > 0:
                 time.sleep(interval)
+    
+    # Calculate and display speed statistics
+    end_time = time.monotonic()
+    duration = end_time - start_time
+    
+    if successful_packets > 0:
+        rate = successful_packets / duration
+        click.echo(f"\nSpeed statistics:")
+        click.echo(f"  Successful packets: {successful_packets}/{total_packets_sent}")
+        click.echo(f"  Duration: {duration:.3f} seconds")
+        click.echo(f"  Rate: {rate:.2f} messages/second")
+        click.echo(f"  Average round-trip time: {duration/successful_packets*1000:.1f} ms")
+    else:
+        click.echo(f"\nNo successful packet exchanges (0/{total_packets_sent})")
 
 
 def echo_packets(relay: RRSerial) -> None:

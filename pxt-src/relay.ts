@@ -45,9 +45,10 @@ namespace radiop {
                 serial.writeLine(CMD_RECEIVE + " " + hex);
 
                 if (self.echoMode) {
+                    radio.sendRawPacket(buffer);
                     const payload = radiop.extractPayload(buffer);
                     if (payload) {
-                        radio.sendRawPacket(buffer);
+                       
                         serial.writeLine("e: " + payload.dump());
 
                     } 
@@ -127,6 +128,11 @@ namespace radiop {
             this.chatterMode = false;
             serial.writeLine("Echo mode: " + (this.echoMode ? "ON" : "OFF"));
             this.updateStatusIcon();
+            if (this.echoMode) {
+                radiop.stopBeacon();
+            } else {
+                radiop.startBeacon();
+            }
         }
 
         private toggleChatter() {
