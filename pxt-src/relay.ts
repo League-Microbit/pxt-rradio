@@ -30,6 +30,7 @@ namespace radiop {
             if (this.running) return;
             this.running = true;
             this.registerRadioHook();
+            this.registerSerialHook();
             control.inBackground(() => this.loop());
             input.onButtonPressed(Button.A, () => this.toggleEcho());
             input.onButtonPressed(Button.B, () => this.toggleChatter());
@@ -42,31 +43,31 @@ namespace radiop {
                 const hex = buffer.toHex();
                 serial.writeLine(CMD_RECEIVE + " " + hex);
 
-                const payload = radiop.extractPayload(buffer);
-                if (payload) {
-                    
-                    if (self.echoMode) {
+                if (self.echoMode) {
+                    const payload = radiop.extractPayload(buffer);
+                    if (payload) {
                         radio.sendRawPacket(buffer);
                         serial.writeLine("e: " + payload.dump());
 
-                    } else {
-                        serial.writeLine("p: " + payload.dump());
-
-                    }
+                    } 
                 } 
+            });
+        }
+
+        private registerSerialHook() {
+            const self = this;
+            serial.onDataReceived("\n", function () {
+                const line = serial.readLine();
+                if (line) self.processCommand(line.trim());
             });
         }
 
         private loop() {
             while (this.running) {
                 this.maybeSendChatter();
-                const line = serial.readLine();
-
-                if (!line) {
-                    basic.pause(10);
-                    continue;
-                }
-                this.processCommand(line.trim());
+            
+                // keep loop responsive for other tasks (chatter, etc.)
+                basic.pause(50);
             }
         }
 
@@ -130,9 +131,8 @@ namespace radiop {
         private toggleChatter() {
             this.chatterMode = !this.chatterMode;
             this.echoMode = false;
-            if (this.chatterMode) {
-                this.chatterDeadline = 0;
-            }
+            this.chatterDeadline = 0;
+           
             serial.writeLine("Chatter mode: " + (this.chatterMode ? "ON" : "OFF"));
             this.updateStatusIcon();
         }
@@ -148,9 +148,14 @@ namespace radiop {
         }
 
         private maybeSendChatter() {
-            if (!this.chatterMode) return;
+
+            if (!this.chatterMode) {
+                return;
+            }
             const now = control.millis();
-            if (now < this.chatterDeadline) return;
+            if (now < this.chatterDeadline) {
+                return;
+            }
             this.chatterDeadline = now + 3000;
             
             const pick = randint(0, 3);
@@ -161,7 +166,10 @@ namespace radiop {
             else packetType = PayloadType.BOT_STATUS;
 
             const packet = radiop.newPacketByType(packetType);
-            if (!packet) return;
+            if (!packet) {
+                serial.writeLine("Failed to create packet "+packetType);
+                return;
+            };
 
             const buf = packet.getBuffer();
             for (let i = 1; i < buf.length; i++) {
@@ -169,7 +177,7 @@ namespace radiop {
             }
 
             packet.send();
-            serial.writeLine("P: " + packet.dump());
+            serial.writeLine("C: " + packet.dump());
         }
     }
 
