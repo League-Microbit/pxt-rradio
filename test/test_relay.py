@@ -296,6 +296,23 @@ def send_structured_packets(relay: RRSerial, count: int, interval: float) -> Non
             if interval > 0:
                 time.sleep(interval)
 
+
+def echo_packets(relay: RRSerial) -> None:
+    click.echo("Listening for incoming packets. Press Ctrl-C to stop.")
+    for command, data in relay:
+        if command == "r":
+            if isinstance(data, bytes) and data:
+                try:
+                    packet = parse_packet(data)
+                except ValueError as exc:
+                    click.echo(f"<< parse-error: {exc} [{data.hex()}]")
+                else:
+                    click.echo(f"<< {packet}")
+            else:
+                click.echo("<< r: (empty packet)")
+        else:
+            log_event(command, data)
+
 @click.command()
 @click.option(
     "--list",
@@ -343,6 +360,13 @@ def send_structured_packets(relay: RRSerial, count: int, interval: float) -> Non
     is_flag=True,
     help="Send random structured packets for each payload type and verify the echoed response.",
 )
+@click.option(
+    "--echo",
+    "-e",
+    "echo_mode",
+    is_flag=True,
+    help="Receive radio packets and print them as decoded strings.",
+)
 def main(
     list_only: bool,
     device: Optional[str],
@@ -351,6 +375,7 @@ def main(
     rand: bool,
     words: bool,
     packets: bool,
+    echo_mode: bool,
 ) -> None:
 
     hex_words = "deadbeefcafefoodbabe8badf00dd00dface"
@@ -371,10 +396,20 @@ def main(
         click.echo("--packets may not be combined with --rand or --words.", err=True)
         sys.exit(2)
 
+    if echo_mode and (packets or rand or words):
+        click.echo("--echo may not be combined with send modes.", err=True)
+        sys.exit(2)
+
     try:
         with RRSerial(device) as relay:
             click.echo(f"Opened {relay.device_path} @ {relay.baudrate} baud")
             relay.reset_input_buffer()
+            if echo_mode:
+                try:
+                    echo_packets(relay)
+                except KeyboardInterrupt:
+                    click.echo("\nStopped listening.")
+                return
             if packets:
                 send_structured_packets(relay, count, interval)
             else:

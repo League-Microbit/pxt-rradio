@@ -19,6 +19,7 @@ namespace radiop {
 
         constructor() {
             radiop.initDefaults();
+            radiop.initBeacon(radiop.DeviceClass.RELAY);
             radiop.useStdHeader(false);
             this.updateStatusIcon();
             serial.setRxBufferSize(128);

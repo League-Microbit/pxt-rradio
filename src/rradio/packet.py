@@ -46,6 +46,17 @@ class RadioPacket:
 	def to_hex(self) -> str:
 		return self.to_bytes().hex()
 
+	def _field_items(self) -> list[tuple[str, object]]:
+		return [
+			("packet_type", self.packet_type),
+			("time", self.time),
+			("serial", self.serial),
+		]
+
+	def __str__(self) -> str:
+		pairs = ", ".join(f"{name}={value}" for name, value in self._field_items())
+		return f"{self.__class__.__name__}({pairs})"
+
 	@classmethod
 	def from_bytes(cls, data: bytes) -> "RadioPacket":
 		raise NotImplementedError("from_bytes must be implemented by subclasses")
@@ -70,6 +81,11 @@ class RawRadioPacket(RadioPacket):
 
 	def payload_bytes(self) -> bytes:
 		return self.payload
+
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.append(("payload", self.payload.hex()))
+		return items
 
 
 def _join_color(red: int, green: int, blue: int) -> int:
@@ -133,6 +149,23 @@ class BotCommandPacket(RadioPacket):
 		self.servo2 = int(servo2)
 		self.data1 = int(data1)
 
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.extend(
+			[
+				("command_type", self.command_type),
+				("motor1", self.motor1),
+				("motor2", self.motor2),
+				("motor3", self.motor3),
+				("motor4", self.motor4),
+				("duration", self.duration),
+				("servo1", self.servo1),
+				("servo2", self.servo2),
+				("data1", self.data1),
+			]
+		)
+		return items
+
 	def payload_bytes(self) -> bytes:
 		return self.PAYLOAD_STRUCT.pack(
 			self.command_type & 0xFF,
@@ -182,6 +215,18 @@ class BotStatusPacket(RadioPacket):
 		self.accel_x = int(accel_x)
 		self.accel_y = int(accel_y)
 		self.accel_z = int(accel_z)
+
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.extend(
+			[
+				("buttons", self.buttons),
+				("accel_x", self.accel_x),
+				("accel_y", self.accel_y),
+				("accel_z", self.accel_z),
+			]
+		)
+		return items
 
 	def payload_bytes(self) -> bytes:
 		return self.PAYLOAD_STRUCT.pack(
@@ -237,6 +282,21 @@ class DisplayPacket(RadioPacket):
 		self.head_lamp_right = int(head_lamp_right) & 0xFFFFFF
 		self.neo_left = int(neo_left) & 0xFFFFFF
 		self.neo_right = int(neo_right) & 0xFFFFFF
+
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.extend(
+			[
+				("tone", self.tone),
+				("duration", self.duration),
+				("image", self.image),
+				("head_lamp_left", self.head_lamp_left),
+				("head_lamp_right", self.head_lamp_right),
+				("neo_left", self.neo_left),
+				("neo_right", self.neo_right),
+			]
+		)
+		return items
 
 	def payload_bytes(self) -> bytes:
 		color_bytes = []
@@ -294,6 +354,19 @@ class HereIAmPacket(RadioPacket):
 		self.channel = int(channel) & 0xFFFF
 		self.flags = int(flags) & 0xFFFF
 		self.image = int(image) & 0xFFFFFFFF
+
+	def _field_items(self) -> list[tuple[str, object]]:
+		items = super()._field_items()
+		items.extend(
+			[
+				("class_id", self.class_id),
+				("group", self.group),
+				("channel", self.channel),
+				("flags", self.flags),
+				("image", self.image),
+			]
+		)
+		return items
 
 	def payload_bytes(self) -> bytes:
 		return self.PAYLOAD_STRUCT.pack(

@@ -9,6 +9,7 @@ namespace radiop {
     export enum DeviceClass {
         UNKNOWN = 0,
         BEACON = 1,
+        RELAY = 2,
         CUTEBOT = 10,
         CUTEBOTPRO = 11,
         JOYSTICK = 20,
